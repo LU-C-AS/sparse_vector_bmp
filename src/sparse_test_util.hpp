@@ -12,23 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
+// module;
+#pragma once
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
 
-export module sparse_test_util;
+// export module sparse_test_util;
 
-import stl;
-import sparse_vector_distance;
-import linscan_alg;
-import sparse_util;
-import infinity_exception;
+// import stl;
+// import sparse_vector_distance;
+// import linscan_alg;
+// import sparse_util;
+// import sparse_vector_bmp_exception;
+#include "stl.hpp"
+#include "sparse_vector_distance.hpp"
+#include "sparse_util.hpp"
+#include "linscan_alg.hpp"
 
-namespace infinity {
+namespace sparse_vector_bmp {
 
-export template <typename DataType, typename IdxType>
+template <typename DataType, typename IdxType>
 struct SparseTestUtil {
     static bool CheckAccurateKnn(const i32 *gt_indices,
                                  const DataType *gt_scores,
@@ -92,13 +96,16 @@ struct SparseTestUtil {
         std::mt19937 rng{std::random_device{}()};
 
         if (sparsity < 0.0 || sparsity > 1.0) {
-            UnrecoverableError("Invalid sparsity.");
+            // UnrecoverableError("Invalid sparsity.");
+            std::cout<<"Invalid sparsity."<<std::endl;
         }
         if (data_min >= data_max) {
-            UnrecoverableError("Invalid data range.");
+            // UnrecoverableError("Invalid data range.");
+            std::cout<<"Invalid data range."<<std::endl;
         }
         if (nrow == 0 || ncol == 0) {
-            UnrecoverableError("Invalid dimension.");
+            // UnrecoverableError("Invalid dimension.");
+            std::cout<<"Invalid dimension."<<std::endl;
         }
         u32 nnz = nrow * ncol * sparsity;
         auto data = MakeUnique<DataType[]>(nnz);
@@ -156,7 +163,8 @@ struct SparseTestUtil {
     static Pair<UniquePtr<i32[]>, UniquePtr<DataType[]>>
     GenerateGroundtruth(const SparseMatrix<DataType, IdxType> &mat, const SparseMatrix<DataType, IdxType> &query, u32 topk, bool use_linscan = true) {
         if (mat.ncol_ != query.ncol_) {
-            UnrecoverableError("Inconsistent dimension.");
+            // UnrecoverableError("Inconsistent dimension.");
+            std::cout<<"Inconsistent dimension."<<std::endl;
         }
         auto gt_indices = MakeUnique<i32[]>(query.nrow_ * topk);
         auto gt_scores = MakeUnique<DataType[]>(query.nrow_ * topk);
@@ -206,4 +214,4 @@ private:
         return {std::move(indices), std::move(top_scores)};
     }
 };
-} // namespace infinity
+} // namespace sparse_vector_bmp

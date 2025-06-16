@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+// module;
 
-export module sparse_vector_distance;
+// export module sparse_vector_distance;
 
-import stl;
+// import stl;
+#pragma once
+#include "stl.hpp"
 
-namespace infinity {
+namespace sparse_vector_bmp {
 
-export template <typename DataType, typename IndexType, typename ResultType = DataType>
+template <typename DataType, typename IndexType, typename ResultType = DataType>
 ResultType SparseIPDistance(const DataType *data1, const IndexType *index1, SizeT nnz1, const DataType *data2, const IndexType *index2, SizeT nnz2) {
     ResultType distance{};
     SizeT i = 0, j = 0;
@@ -38,7 +40,7 @@ ResultType SparseIPDistance(const DataType *data1, const IndexType *index1, Size
     return distance;
 }
 
-export template <typename IndexType, typename ResultType = IndexType>
+template <typename IndexType, typename ResultType = IndexType>
 ResultType SparseBitIPDistance(const IndexType *idx1, SizeT nnz1, const IndexType *idx2, SizeT nnz2) {
     ResultType distance{};
     SizeT i = 0, j = 0;
@@ -56,4 +58,4 @@ ResultType SparseBitIPDistance(const IndexType *idx1, SizeT nnz1, const IndexTyp
     return distance;
 }
 
-} // namespace infinity
+} // namespace sparse_vector_bmp

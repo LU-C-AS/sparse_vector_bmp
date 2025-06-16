@@ -12,22 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+// module;
+#pragma once
 
 #include <algorithm>
 #include <vector>
 
-export module linscan_alg;
+// export module linscan_alg;
 
-import stl;
-import sparse_util;
-import local_file_handle;
-import knn_result_handler;
-import serialize;
-import infinity_exception;
-import third_party;
+// import stl;
+// import sparse_util;
+// import local_file_handle;
+// import knn_result_handler;
+// import serialize;
+// import sparse_vector_bmp_exception;
+// import third_party;
+#include "stl.hpp"
+#include "sparse_util.hpp"
+#include "mem_rw_handler.hpp"
 
-namespace infinity {
+namespace sparse_vector_bmp {
 
 template <typename DataType>
 struct Posting {
@@ -49,7 +53,7 @@ struct Posting {
     static SizeT GetSizeInBytes() { return sizeof(doc_id_) + sizeof(val_); }
 };
 
-export template <typename DataType, typename IdxType>
+template <typename DataType, typename IdxType>
 class LinScan {
 public:
     LinScan(SizeT max_col) : inverted_idx_(max_col) {}
@@ -134,23 +138,23 @@ public:
 
     u32 row_num() const { return row_num_; }
 
-    void Save(LocalFileHandle &file_handle) const {
-        SizeT bytes = GetSizeInBytes();
-        auto buffer = MakeUnique<char[]>(sizeof(bytes) + bytes);
-        char *p = buffer.get();
-        WriteBufAdv<SizeT>(p, bytes);
-        WriteAdv(p);
-        file_handle.Append(buffer.get(), sizeof(bytes) + bytes);
-    }
+    // void Save(LocalFileHandle &file_handle) const {
+    //     SizeT bytes = GetSizeInBytes();
+    //     auto buffer = MakeUnique<char[]>(sizeof(bytes) + bytes);
+    //     char *p = buffer.get();
+    //     WriteBufAdv<SizeT>(p, bytes);
+    //     WriteAdv(p);
+    //     file_handle.Append(buffer.get(), sizeof(bytes) + bytes);
+    // }
 
-    static LinScan Load(LocalFileHandle &file_handle) {
-        SizeT bytes;
-        file_handle.Read(&bytes, sizeof(bytes));
-        auto buffer = MakeUnique<char[]>(bytes);
-        file_handle.Read(buffer.get(), bytes);
-        const char *buffer_ptr = buffer.get();
-        return ReadAdv(buffer_ptr);
-    }
+    // static LinScan Load(LocalFileHandle &file_handle) {
+    //     SizeT bytes;
+    //     file_handle.Read(&bytes, sizeof(bytes));
+    //     auto buffer = MakeUnique<char[]>(bytes);
+    //     file_handle.Read(buffer.get(), bytes);
+    //     const char *buffer_ptr = buffer.get();
+    //     return ReadAdv(buffer_ptr);
+    // }
 
 private:
     void WriteAdv(char *&p) const {
@@ -180,11 +184,13 @@ private:
             for (SizeT j = 0; j < posting_size; ++j) {
                 posting_list[j] = Posting<DataType>::ReadAdv(p);
                 if (j > 0 && posting_list[j].doc_id_ <= posting_list[j - 1].doc_id_) {
-                    UnrecoverableError("Duplicate doc_id in posting list");
+                    // UnrecoverableError("Duplicate doc_id in posting list");
+                    std::cout<<"Duplicate doc_id in posting list"<<std::endl;
                 }
             }
             if (!res.inverted_idx_.empty()) {
-                UnrecoverableError("Duplicate indice in inverted index");
+                // UnrecoverableError("Duplicate indice in inverted index");
+                std::cout<<"Duplicate indice in inverted index"<<std::endl;
             }
             res.inverted_idx_[indice] = std::move(posting_list);
         }
@@ -207,4 +213,4 @@ private:
     u32 row_num_{};
 };
 
-} // namespace infinity
+} // namespace sparse_vector_bmp

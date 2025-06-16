@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+// module;
+#include "stl.hpp"
 
 #include <cassert>
 #include <iostream>
 #include <vector>
 
-export module bp_reordering;
+// export module bp_reordering;
 
-import stl;
-import third_party;
+// import stl;
+// import third_party;
 
-namespace infinity {
+namespace sparse_vector_bmp {
 
 // ref: https://github.com/pisa-engine/pisa
 // ref: Compressing Graphs and Indexes with Recursive Graph Bisection
@@ -48,7 +49,7 @@ public:
     Vector<i32> gains_permu_;
 };
 
-export template <typename IdxType, typename DocID>
+template <typename IdxType, typename DocID>
 class BPReordering {
 public:
     BPReordering(i32 query_n) : query_n_(query_n), terminate_length_(32), iter_n_(20), log_thread_n_(4) {}
@@ -223,4 +224,4 @@ private:
     SizeT log_thread_n_;
 };
 
-} // namespace infinity
+} // namespace sparse_vector_bmp

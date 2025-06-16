@@ -12,48 +12,54 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+// module;
 
-export module bmp_alg;
+// export module bmp_alg;
 
-import stl;
-import sparse_util;
-import local_file_handle;
-import bmp_util;
-import hnsw_common;
-import knn_result_handler;
-import bmp_ivt;
-import bmp_fwd;
-import bp_reordering;
-import serialize;
-import third_party;
-import infinity_exception;
+// import stl;
+// import sparse_util;
+// import local_file_handle;
+// import bmp_util;
+// import hnsw_common;
+// import knn_result_handler;
+// import bmp_ivt;
+// import bmp_fwd;
+// import bp_reordering;
+// import serialize;
+// import third_party;
+// import sparse_vector_bmp_exception;
+#pragma once
+#include "bmp_fwd.hpp"
+#include "bmp_ivt.hpp"
+#include "sparse_util.hpp"
+#include "result_handler.hpp"
+#include "bp_reordering.hpp"
 
-namespace infinity {
+namespace sparse_vector_bmp {
 
 // ref: https://github.com/pisa-engine/BMP
 // ref: Faster Learned Sparse Retrieval with Block-Max Pruning
 // ref: A Candidate Filtering Mechanism for Fast Top-K Query Processing on Modern CPUs
 
-export template <typename DataType, typename IdxType, BMPCompressType CompressType, BMPOwnMem OwnMem>
+template <typename DataType, typename IdxType>
 class BMPAlgBase {
 public:
 protected:
-    BMPAlgBase(BMPIvt<DataType, CompressType, OwnMem> bm_ivt, BlockFwd<DataType, IdxType, OwnMem> block_fwd, VecPtr<BMPDocID, OwnMem> doc_ids)
+    BMPAlgBase(BMPIvt<DataType> bm_ivt, BlockFwd<DataType, IdxType> block_fwd, VecPtr<BMPDocID> doc_ids)
         : bm_ivt_(std::move(bm_ivt)), block_fwd_(std::move(block_fwd)), doc_ids_(std::move(doc_ids)) {}
     BMPAlgBase(SizeT term_num, SizeT block_size) : bm_ivt_(term_num), block_fwd_(block_size) {}
 
 public:
     BMPAlgBase() {}
 
+    // Pair<Vector<BMPDocID>, Vector<DataType>>
+    // SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options) const {
+    //     return SearchKnn(query, topk, options, nullptr);
+    // }
+
+    // template <FilterConcept<BMPDocID> Filter = NoneType>
     Pair<Vector<BMPDocID>, Vector<DataType>>
     SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options) const {
-        return SearchKnn(query, topk, options, nullptr);
-    }
-
-    template <FilterConcept<BMPDocID> Filter = NoneType>
-    Pair<Vector<BMPDocID>, Vector<DataType>>
-    SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options, const Filter &filter) const {
         if (topk == 0) {
             return {{}, {}};
         }
@@ -107,13 +113,13 @@ public:
         HeapResultHandler<CompareMin<DataType, BMPDocID>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
 
         auto add_result = [&](DataType score, BMPDocID doc_id) {
-            if constexpr (std::is_same_v<Filter, std::nullptr_t>) {
-                result_handler.AddResult(0 /*query_id*/, score, doc_id);
-            } else {
-                if (doc_id < BMPDocID(doc_ids_.size()) && filter(doc_ids_[doc_id])) {
+            // if constexpr (std::is_same_v<Filter, std::nullptr_t>) {
+            //     result_handler.AddResult(0 /*query_id*/, score, doc_id);
+            // } else {
+                if (doc_id < BMPDocID(doc_ids_.size()) /*&& filter(doc_ids_[doc_id])*/) {
                     result_handler.AddResult(0 /*query_id*/, score, doc_id);
                 }
-            }
+            // }
         };
 
         SizeT block_scores_num = block_scores.size();
@@ -157,7 +163,7 @@ public:
     }
 
 protected:
-    Vector<DataType> GetScores(const BlockTerms<DataType, IdxType, OwnMem> &block_terms, const SparseVecRef<DataType, IdxType> &query) const {
+    Vector<DataType> GetScores(const BlockTerms<DataType, IdxType> &block_terms, const SparseVecRef<DataType, IdxType> &query) const {
         Vector<DataType> res(block_fwd_.block_size(), 0.0);
 
         i32 i = 0;
@@ -184,38 +190,38 @@ protected:
         }
     }
 
-    static void Calculate2(Vector<DataType> &upper_bounds, DataType query_score, const BlockData<DataType, CompressType, OwnMem> &block_data) {
-        if constexpr (CompressType == BMPCompressType::kCompressed) {
-            SizeT block_num = block_data.block_num();
-            const BMPBlockID *block_ids = block_data.block_ids();
-            const DataType *max_scores = block_data.max_scores();
-            for (SizeT i = 0; i < block_num; ++i) {
-                BMPBlockID block_id = block_ids[i];
-                DataType score = max_scores[i];
-                upper_bounds[block_id] += score * query_score;
-            }
-        } else {
-            SizeT block_num = block_data.block_num();
-            const DataType *max_scores = block_data.max_scores();
-            for (BMPBlockID block_id = 0; block_id < BMPBlockID(block_num); ++block_id) {
-                if (max_scores[block_id] > 0.0) {
-                    upper_bounds[block_id] += max_scores[block_id] * query_score;
-                }
+    static void Calculate2(Vector<DataType> &upper_bounds, DataType query_score, const BlockData<DataType> &block_data) {
+        // if constexpr (CompressType == BMPCompressType::kCompressed) {
+        //     SizeT block_num = block_data.block_num();
+        //     const BMPBlockID *block_ids = block_data.block_ids();
+        //     const DataType *max_scores = block_data.max_scores();
+        //     for (SizeT i = 0; i < block_num; ++i) {
+        //         BMPBlockID block_id = block_ids[i];
+        //         DataType score = max_scores[i];
+        //         upper_bounds[block_id] += score * query_score;
+        //     }
+        // } else {
+        SizeT block_num = block_data.block_num();
+        const DataType *max_scores = block_data.max_scores();
+        for (BMPBlockID block_id = 0; block_id < BMPBlockID(block_num); ++block_id) {
+            if (max_scores[block_id] > 0.0) {
+                upper_bounds[block_id] += max_scores[block_id] * query_score;
             }
         }
+        // }
     }
 
 protected:
-    BMPIvt<DataType, CompressType, OwnMem> bm_ivt_;
-    BlockFwd<DataType, IdxType, OwnMem> block_fwd_;
-    VecPtr<BMPDocID, OwnMem> doc_ids_;
+    BMPIvt<DataType> bm_ivt_;
+    BlockFwd<DataType, IdxType> block_fwd_;
+    VecPtr<BMPDocID> doc_ids_;
 };
 
-export template <typename DataType, typename IdxType, BMPCompressType CompressType, BMPOwnMem OwnMem = BMPOwnMem::kTrue>
-class BMPAlg {};
+// template <typename DataType, typename IdxType>
+// class BMPAlg {};
 
-export template <typename DataType, typename IdxType, BMPCompressType CompressType>
-class BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kTrue> : public BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kTrue> {
+template <typename DataType, typename IdxType>
+class BMPAlg: public BMPAlgBase<DataType, IdxType> {
 public:
     using DataT = DataType;
     using IdxT = IdxType;
@@ -223,14 +229,14 @@ public:
     constexpr static bool kOwnMem = true;
 
 private:
-    BMPAlg(BMPIvt<DataType, CompressType, BMPOwnMem::kTrue> bm_ivt,
-           BlockFwd<DataType, IdxType, BMPOwnMem::kTrue> block_fwd,
-           VecPtr<BMPDocID, BMPOwnMem::kTrue> doc_ids)
-        : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kTrue>(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids)) {}
+    BMPAlg(BMPIvt<DataType> bm_ivt,
+           BlockFwd<DataType, IdxType> block_fwd,
+           VecPtr<BMPDocID> doc_ids)
+        : BMPAlgBase<DataType, IdxType>(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids)) {}
 
 public:
     BMPAlg() = default;
-    BMPAlg(SizeT term_num, SizeT block_size) : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kTrue>(term_num, block_size) {}
+    BMPAlg(SizeT term_num, SizeT block_size) : BMPAlgBase<DataType, IdxType>(term_num, block_size) {}
 
     void AddDoc(const SparseVecRef<DataType, IdxType> &doc, BMPDocID doc_id, bool lck = true) {
         std::unique_lock<std::shared_mutex> lock;
@@ -251,20 +257,20 @@ public:
         mem_usage_.fetch_add(sizeof(BMPDocID) + mem_usage);
     }
 
-    template <DataIteratorConcept<SparseVecRef<DataType, IdxType>, BMPDocID> Iterator>
-    SizeT AddDocs(Iterator iter) {
-        SizeT cnt = 0;
-        while (true) {
-            auto ret = iter.Next();
-            if (!ret.has_value()) {
-                break;
-            }
-            const auto &[sparse_ref, doc_id] = *ret;
-            AddDoc(sparse_ref, doc_id);
-            ++cnt;
-        }
-        return cnt;
-    }
+    // template <SparseVecRef<DataType, IdxType>, BMPDocID> Iterator
+    // SizeT AddDocs(Iterator iter) {
+    //     SizeT cnt = 0;
+    //     while (true) {
+    //         auto ret = iter.Next();
+    //         if (!ret.has_value()) {
+    //             break;
+    //         }
+    //         const auto &[sparse_ref, doc_id] = *ret;
+    //         AddDoc(sparse_ref, doc_id);
+    //         ++cnt;
+    //     }
+    //     return cnt;
+    // }
 
     SizeT DocNum() const {
         std::shared_lock lock(mtx_);
@@ -282,10 +288,10 @@ public:
                 break;
             }
 
-            this->bm_ivt_ = BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>(term_num);
+            this->bm_ivt_ = BMPIvt<DataType>(term_num);
             Vector<Pair<Vector<IdxType>, Vector<DataType>>> fwd = this->block_fwd_.GetFwd(doc_num, term_num);
             TailFwd<DataType, IdxType> tail_fwd = this->block_fwd_.GetTailFwd();
-            this->block_fwd_ = BlockFwd<DataType, IdxType, BMPOwnMem::kTrue>(block_size);
+            this->block_fwd_ = BlockFwd<DataType, IdxType>(block_size);
 
             BPReordering<IdxType, BMPDocID> bp(term_num);
             // add bp parameter here
@@ -314,41 +320,41 @@ public:
         }
     }
 
-    Pair<Vector<BMPDocID>, Vector<DataType>>
-    SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options) const {
-        return SearchKnn(query, topk, options, nullptr);
-    }
+    // Pair<Vector<BMPDocID>, Vector<DataType>>
+    // SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options) const {
+    //     return SearchKnn(query, topk, options);
+    // }
 
-    template <FilterConcept<BMPDocID> Filter = NoneType>
-    Pair<Vector<BMPDocID>, Vector<DataType>>
-    SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options, const Filter &filter) const {
-        std::shared_lock lock(mtx_, std::defer_lock);
-        if (options.use_lock_) {
-            lock.lock();
-        }
-        return BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kTrue>::SearchKnn(query, topk, options, filter);
-    }
+    // template <FilterConcept<BMPDocID> Filter = NoneType>
+    // Pair<Vector<BMPDocID>, Vector<DataType>>
+    // SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options, const Filter &filter) const {
+    //     std::shared_lock lock(mtx_, std::defer_lock);
+    //     if (options.use_lock_) {
+    //         lock.lock();
+    //     }
+    //     return BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kTrue>::SearchKnn(query, topk, options, filter);
+    // }
 
-    void Save(LocalFileHandle &file_handle) const {
-        auto size = GetSizeInBytes();
-        auto buffer = MakeUnique<char[]>(sizeof(size) + size);
-        char *p = buffer.get();
-        WriteBufAdv<SizeT>(p, size);
-        WriteAdv(p);
-        if (SizeT write_n = p - buffer.get(); write_n != sizeof(size) + size) {
-            UnrecoverableError(fmt::format("BMPAlg::Save: write_n != sizeof(size) + size: {} != {}", write_n, sizeof(size) + size));
-        }
-        file_handle.Append(buffer.get(), sizeof(size) + size);
-    }
+    // void Save(LocalFileHandle &file_handle) const {
+    //     auto size = GetSizeInBytes();
+    //     auto buffer = MakeUnique<char[]>(sizeof(size) + size);
+    //     char *p = buffer.get();
+    //     WriteBufAdv<SizeT>(p, size);
+    //     WriteAdv(p);
+    //     if (SizeT write_n = p - buffer.get(); write_n != sizeof(size) + size) {
+    //         UnrecoverableError(fmt::format("BMPAlg::Save: write_n != sizeof(size) + size: {} != {}", write_n, sizeof(size) + size));
+    //     }
+    //     file_handle.Append(buffer.get(), sizeof(size) + size);
+    // }
 
-    static BMPAlg<DataType, IdxType, CompressType> Load(LocalFileHandle &file_handle) {
-        SizeT size;
-        file_handle.Read(&size, sizeof(size));
-        auto buffer = MakeUnique<char[]>(size);
-        file_handle.Read(buffer.get(), size);
-        const char *p = buffer.get();
-        return ReadAdv(p);
-    }
+    // static BMPAlg<DataType, IdxType, CompressType> Load(LocalFileHandle &file_handle) {
+    //     SizeT size;
+    //     file_handle.Read(&size, sizeof(size));
+    //     auto buffer = MakeUnique<char[]>(size);
+    //     file_handle.Read(buffer.get(), size);
+    //     const char *p = buffer.get();
+    //     return ReadAdv(p);
+    // }
 
     SizeT GetSizeInBytes() const {
         std::shared_lock lock(mtx_);
@@ -363,36 +369,36 @@ public:
 
     inline SizeT MemoryUsage() const { return mem_usage_.load(); }
 
-    void SaveToPtr(LocalFileHandle &file_handle) {
-        Finalize();
+    // void SaveToPtr(LocalFileHandle &file_handle) {
+    //     Finalize();
 
-        char *p0 = nullptr;
-        GetSizeToPtr(p0);
-        char *p1 = nullptr;
-        SizeT size = p0 - p1;
-        auto buffer = MakeUnique<char[]>(size);
-        char *p = buffer.get();
-        WriteToPtr(p);
-        if (SizeT write_n = p - buffer.get(); write_n != size) {
-            UnrecoverableError(fmt::format("BMPAlg::SaveToPtr: write_n != size: {} != {}", write_n, size));
-        }
-        file_handle.Append(buffer.get(), size);
-    }
+    //     char *p0 = nullptr;
+    //     GetSizeToPtr(p0);
+    //     char *p1 = nullptr;
+    //     SizeT size = p0 - p1;
+    //     auto buffer = MakeUnique<char[]>(size);
+    //     char *p = buffer.get();
+    //     WriteToPtr(p);
+    //     if (SizeT write_n = p - buffer.get(); write_n != size) {
+    //         UnrecoverableError(fmt::format("BMPAlg::SaveToPtr: write_n != size: {} != {}", write_n, size));
+    //     }
+    //     file_handle.Append(buffer.get(), size);
+    // }
 
-    static BMPAlg<DataType, IdxType, CompressType> LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
-        auto buffer = MakeUnique<char[]>(file_size);
-        file_handle.Read(buffer.get(), file_size);
-        const char *p = buffer.get();
-        auto bm_ivt = BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::ReadFromPtr(p);
-        auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kTrue>::LoadFromPtr(p);
-        SizeT doc_num = ReadBufAdvAligned<SizeT>(p);
-        const BMPDocID *doc_ids_ptr = ReadBufVecAdvAligned<BMPDocID>(p, doc_num);
-        Vector<BMPDocID> doc_ids(doc_ids_ptr, doc_ids_ptr + doc_num);
-        if (SizeT(p - buffer.get()) != file_size) {
-            UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - buffer.get() != file_size: {} != {}", p - buffer.get(), file_size));
-        }
-        return BMPAlg(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids));
-    }
+    // static BMPAlg<DataType, IdxType, CompressType> LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
+    //     auto buffer = MakeUnique<char[]>(file_size);
+    //     file_handle.Read(buffer.get(), file_size);
+    //     const char *p = buffer.get();
+    //     auto bm_ivt = BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::ReadFromPtr(p);
+    //     auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kTrue>::LoadFromPtr(p);
+    //     SizeT doc_num = ReadBufAdvAligned<SizeT>(p);
+    //     const BMPDocID *doc_ids_ptr = ReadBufVecAdvAligned<BMPDocID>(p, doc_num);
+    //     Vector<BMPDocID> doc_ids(doc_ids_ptr, doc_ids_ptr + doc_num);
+    //     if (SizeT(p - buffer.get()) != file_size) {
+    //         UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - buffer.get() != file_size: {} != {}", p - buffer.get(), file_size));
+    //     }
+    //     return BMPAlg(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids));
+    // }
 
 private:
     void Finalize() {
@@ -414,9 +420,9 @@ private:
     }
 
     void WriteToPtr(char *&p) const {
-        if (reinterpret_cast<SizeT>(p) % kAlign != 0) {
-            UnrecoverableError(fmt::format("BMPAlg::WriteToPtr: p % kAlign != 0: {} % {} != 0", reinterpret_cast<SizeT>(p), kAlign));
-        }
+        // if (reinterpret_cast<SizeT>(p) % kAlign != 0) {
+        //     UnrecoverableError(fmt::format("BMPAlg::WriteToPtr: p % kAlign != 0: {} % {} != 0", reinterpret_cast<SizeT>(p), kAlign));
+        // }
         char *start = p;
         this->bm_ivt_.WriteToPtr(p);
         [[maybe_unused]] SizeT sz1 = p - start;
@@ -439,9 +445,9 @@ private:
         WriteBufVecAdv(p, this->doc_ids_.data(), this->doc_ids_.size());
     }
 
-    static BMPAlg<DataType, IdxType, CompressType> ReadAdv(const char *&p) {
-        auto postings = BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::ReadAdv(p);
-        auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kTrue>::ReadAdv(p);
+    static BMPAlg<DataType, IdxType> ReadAdv(const char *&p) {
+        auto postings = BMPIvt<DataType>::ReadAdv(p);
+        auto block_fwd = BlockFwd<DataType, IdxType>::ReadAdv(p);
         SizeT doc_num = ReadBufAdv<SizeT>(p);
         Vector<BMPDocID> doc_ids(doc_num);
         for (SizeT i = 0; i < doc_num; ++i) {
@@ -455,40 +461,40 @@ private:
 
     mutable std::shared_mutex mtx_;
 };
+template class BMPAlg<float, int32_t>;
+// export template <typename DataType, typename IdxType>
+// class BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse> : public BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kFalse> {
+// public:
+//     using DataT = DataType;
+//     using IdxT = IdxType;
+//     constexpr static bool kOwnMem = false;
+//     constexpr static SizeT kAlign = 8;
 
-export template <typename DataType, typename IdxType, BMPCompressType CompressType>
-class BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse> : public BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kFalse> {
-public:
-    using DataT = DataType;
-    using IdxT = IdxType;
-    constexpr static bool kOwnMem = false;
-    constexpr static SizeT kAlign = 8;
+// private:
+//     BMPAlg(BMPIvt<DataType, CompressType, BMPOwnMem::kFalse> bm_ivt,
+//            BlockFwd<DataType, IdxType, BMPOwnMem::kFalse> block_fwd,
+//            VecPtr<BMPDocID, BMPOwnMem::kFalse> doc_ids)
+//         : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kFalse>(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids)) {}
 
-private:
-    BMPAlg(BMPIvt<DataType, CompressType, BMPOwnMem::kFalse> bm_ivt,
-           BlockFwd<DataType, IdxType, BMPOwnMem::kFalse> block_fwd,
-           VecPtr<BMPDocID, BMPOwnMem::kFalse> doc_ids)
-        : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kFalse>(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids)) {}
+// public:
+//     static BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse> LoadFromPtr(const char *&p, SizeT size) {
+//         if (reinterpret_cast<SizeT>(p) % kAlign != 0) {
+//             UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p % kAlign != 0: {} % {} != 0", reinterpret_cast<SizeT>(p), kAlign));
+//         }
+//         const char *start = p;
+//         auto bm_ivt = BMPIvt<DataType, CompressType, BMPOwnMem::kFalse>::ReadFromPtr(p);
+//         auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kFalse>::LoadFromPtr(p);
+//         SizeT doc_num = ReadBufAdvAligned<SizeT>(p);
+//         const BMPDocID *doc_ids = ReadBufVecAdvAligned<BMPDocID>(p, doc_num);
+//         if (SizeT(p - start) != size) {
+//             UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - start != size: {} != {}", p - start, size));
+//         }
+//         return BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse>(std::move(bm_ivt),
+//                                                                           std::move(block_fwd),
+//                                                                           VecPtr<BMPDocID, BMPOwnMem::kFalse>(doc_ids, doc_num));
+//     }
 
-public:
-    static BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse> LoadFromPtr(const char *&p, SizeT size) {
-        if (reinterpret_cast<SizeT>(p) % kAlign != 0) {
-            UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p % kAlign != 0: {} % {} != 0", reinterpret_cast<SizeT>(p), kAlign));
-        }
-        const char *start = p;
-        auto bm_ivt = BMPIvt<DataType, CompressType, BMPOwnMem::kFalse>::ReadFromPtr(p);
-        auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kFalse>::LoadFromPtr(p);
-        SizeT doc_num = ReadBufAdvAligned<SizeT>(p);
-        const BMPDocID *doc_ids = ReadBufVecAdvAligned<BMPDocID>(p, doc_num);
-        if (SizeT(p - start) != size) {
-            UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - start != size: {} != {}", p - start, size));
-        }
-        return BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse>(std::move(bm_ivt),
-                                                                          std::move(block_fwd),
-                                                                          VecPtr<BMPDocID, BMPOwnMem::kFalse>(doc_ids, doc_num));
-    }
+// private:
+// };
 
-private:
-};
-
-} // namespace infinity
+} // namespace sparse_vector_bmp
