@@ -5,10 +5,7 @@
 #include <stdio.h>
 
 using namespace sparse_vector_bmp;
-TEST(BMPTest, test1) {
-    //arrange
-    //act
-    //assert
+TEST(BMPTest, basic) {
     u32 ncol = 2;
     u32 block_size = 2;
 
@@ -55,6 +52,6 @@ TEST(BMPTest, test1) {
     ASSERT_EQ(scores[3], 2.0);
     ASSERT_EQ(scores[4], 2.0);
 
-    printf("test complete\n");
+    // printf("test complete\n");
 }
 

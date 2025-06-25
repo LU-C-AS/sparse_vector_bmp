@@ -20,6 +20,11 @@
 #include "sparse_vector_distance.hpp"
 #include "stl.hpp"
 #include "result_handler.hpp"
+#include "stdio.h"
+#include <cstring>
+#include <fcntl.h>
+#include <filesystem>
+#include <unistd.h>
 
 // export module sparse_util;
 
@@ -36,6 +41,58 @@ namespace sparse_vector_bmp {
 using BMPBlockID = i32;
 using BMPBlockOffset = u8;
 using BMPDocID = u32;
+
+class FileHandle {
+public:
+    FileHandle(const String &path): path_(path) {}
+    ~FileHandle() {
+        if (fd_ == -1) {
+            return;
+        }
+        i32 ret = close(fd_);
+        if(ret == -1){
+            printf("failed to close file: %s\n", path_.c_str());
+        }
+        fd_ = -1;
+        path_.clear();
+    }
+    int Open() {
+        fd_ = open(path_.c_str(), O_RDONLY, 0666);
+        return fd_ != -1;
+    }
+    void Close() {
+        if (fd_ == -1) {
+            return;
+        }
+        i32 ret = close(fd_);
+        if(ret == -1){
+            printf("failed to close file: %s\n", path_.c_str());
+        }
+        fd_ = -1;
+        path_.clear();
+    }
+    SizeT Read(void *buffer, u64 nbytes) {
+        i64 read_n = 0;
+        while (read_n < (i64)nbytes) {
+            SizeT a = nbytes - read_n;
+            i64 read_count = read(fd_, (char *)buffer + read_n, a);
+            if (read_count == 0) {
+                break;
+            }
+            if (read_count == -1) {
+                printf("Can't read file: %s\n", path_.c_str());
+                // String error_message = fmt::format("Can't read file: {}: {}", path_, strerror(errno));
+                // UnrecoverableError(error_message);
+            }
+            read_n += read_count;
+        }
+        return read_n;
+    }
+private:
+    i32 fd_{-1};
+    String path_{};
+};
+
 
 template <typename T>
 class VecPtr {
@@ -67,7 +124,7 @@ struct BmpSearchOptions {
 };
 
 struct BMPOptimizeOptions {
-    i32 topk_ = 0;
+    u32 topk_ = 0;
     bool bp_reorder_ = false;
 };
 
@@ -122,34 +179,40 @@ public:
         return SparseVecRef<DataT, IdxT>(nnz, indices, data);
     }
 
-    // static SparseMatrix Load(LocalFileHandle &file_handle) {
-    //     i64 nrow = 0;
-    //     i64 ncol = 0;
-    //     i64 nnz = 0;
-    //     file_handle.Read(&nrow, sizeof(nrow));
-    //     file_handle.Read(&ncol, sizeof(ncol));
-    //     file_handle.Read(&nnz, sizeof(nnz));
+    static SparseMatrix Load(FileHandle &file_handle) {
+        i64 nrow = 0;
+        i64 ncol = 0;
+        i64 nnz = 0;
+        file_handle.Read(&nrow, sizeof(nrow));
+        file_handle.Read(&ncol, sizeof(ncol));
+        file_handle.Read(&nnz, sizeof(nnz));
 
-    //     auto indptr = MakeUnique<i64[]>(nrow + 1);
-    //     file_handle.Read(indptr.get(), sizeof(i64) * (nrow + 1));
-    //     if (indptr[nrow] != nnz) {
-    //         UnrecoverableError("Invalid indptr.");
-    //     }
+        auto indptr = MakeUnique<i64[]>(nrow + 1);
+        file_handle.Read(indptr.get(), sizeof(i64) * (nrow + 1));
+        if (indptr[nrow] != nnz) {
+            // UnrecoverableError("Invalid indptr.");
+            printf("Invalid indptr.\n");
+            // std::cerr<<"Invalid indptr."<<std::endl;
+            return {};
+        }
 
-    //     auto indices = MakeUnique<IdxT[]>(nnz);
-    //     file_handle.Read(indices.get(), sizeof(IdxT) * nnz);
-    //     // assert all element in indices >= 0 and < ncol
-    //     {
-    //         bool check = std::all_of(indices.get(), indices.get() + nnz, [ncol](IdxT ele) { return ele >= 0 && ele < ncol; });
-    //         if (!check) {
-    //             UnrecoverableError("Invalid indices.");
-    //         }
-    //     }
+        auto indices = MakeUnique<IdxT[]>(nnz);
+        file_handle.Read(indices.get(), sizeof(IdxT) * nnz);
+        // assert all element in indices >= 0 and < ncol
+        {
+            bool check = std::all_of(indices.get(), indices.get() + nnz, [ncol](IdxT ele) { return ele >= 0 && ele < ncol; });
+            if (!check) {
+                // UnrecoverableError("Invalid indices.");
+                // std::cerr<"Invalid indices."<<std::endl;
+                printf("Invalid indices.\n");
+                return {};
+            }
+        }
 
-    //     auto data = MakeUnique<DataT[]>(nnz);
-    //     file_handle.Read(data.get(), sizeof(DataT) * nnz);
-    //     return {std::move(data), std::move(indices), std::move(indptr), nrow, ncol, nnz};
-    // }
+        auto data = MakeUnique<DataT[]>(nnz);
+        file_handle.Read(data.get(), sizeof(DataT) * nnz);
+        return {std::move(data), std::move(indices), std::move(indptr), nrow, ncol, nnz};
+    }
 
     // void Save(LocalFileHandle &file_handle) const {
     //     file_handle.Append(&nrow_, sizeof(nrow_));

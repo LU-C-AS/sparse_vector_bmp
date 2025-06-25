@@ -189,13 +189,13 @@ inline String TrimString(const String &s) {
 //     return tokens;
 // }
 
-void ToUpper(String & str) { std::transform(str.begin(), str.end(), str.begin(), ::toupper); }
+inline void ToUpper(String & str) { std::transform(str.begin(), str.end(), str.begin(), ::toupper); }
 
-int ToUpper(int c) { return ::toupper(c); }
+inline int ToUpper(int c) { return ::toupper(c); }
 
-void ToLower(String & str) { std::transform(str.begin(), str.end(), str.begin(), ::tolower); }
+inline void ToLower(String & str) { std::transform(str.begin(), str.end(), str.begin(), ::tolower); }
 
-int ToLower(int c) { return ::tolower(c); }
+inline int ToLower(int c) { return ::tolower(c); }
 
 inline void StringToLower(String & str) {
     std::transform(str.begin(), str.end(), str.begin(), [](const auto c) { return std::tolower(c); });

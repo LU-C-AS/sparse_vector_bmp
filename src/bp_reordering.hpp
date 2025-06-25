@@ -12,17 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// module;
 #include "stl.hpp"
 
 #include <cassert>
 #include <iostream>
 #include <vector>
-
-// export module bp_reordering;
-
-// import stl;
-// import third_party;
 
 namespace sparse_vector_bmp {
 

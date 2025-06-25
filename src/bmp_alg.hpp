@@ -12,28 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// module;
-
-// export module bmp_alg;
-
-// import stl;
-// import sparse_util;
-// import local_file_handle;
-// import bmp_util;
-// import hnsw_common;
-// import knn_result_handler;
-// import bmp_ivt;
-// import bmp_fwd;
-// import bp_reordering;
-// import serialize;
-// import third_party;
-// import sparse_vector_bmp_exception;
 #pragma once
 #include "bmp_fwd.hpp"
 #include "bmp_ivt.hpp"
 #include "sparse_util.hpp"
 #include "result_handler.hpp"
 #include "bp_reordering.hpp"
+#include <stdio.h>
 
 namespace sparse_vector_bmp {
 
@@ -52,12 +37,6 @@ protected:
 public:
     BMPAlgBase() {}
 
-    // Pair<Vector<BMPDocID>, Vector<DataType>>
-    // SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options) const {
-    //     return SearchKnn(query, topk, options, nullptr);
-    // }
-
-    // template <FilterConcept<BMPDocID> Filter = NoneType>
     Pair<Vector<BMPDocID>, Vector<DataType>>
     SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options) const {
         if (topk == 0) {
@@ -105,9 +84,11 @@ public:
                 block_scores.emplace_back(upper_bounds[block_id], block_id);
             }
         }
+
         // 排序后
         std::sort(block_scores.begin(), block_scores.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
 
+        // printf("scores len: %d", block_scores.size());
         Vector<BMPDocID> result(topk);
         Vector<DataType> result_score(topk);
         HeapResultHandler<CompareMin<DataType, BMPDocID>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
@@ -191,16 +172,6 @@ protected:
     }
 
     static void Calculate2(Vector<DataType> &upper_bounds, DataType query_score, const BlockData<DataType> &block_data) {
-        // if constexpr (CompressType == BMPCompressType::kCompressed) {
-        //     SizeT block_num = block_data.block_num();
-        //     const BMPBlockID *block_ids = block_data.block_ids();
-        //     const DataType *max_scores = block_data.max_scores();
-        //     for (SizeT i = 0; i < block_num; ++i) {
-        //         BMPBlockID block_id = block_ids[i];
-        //         DataType score = max_scores[i];
-        //         upper_bounds[block_id] += score * query_score;
-        //     }
-        // } else {
         SizeT block_num = block_data.block_num();
         const DataType *max_scores = block_data.max_scores();
         for (BMPBlockID block_id = 0; block_id < BMPBlockID(block_num); ++block_id) {
@@ -208,7 +179,6 @@ protected:
                 upper_bounds[block_id] += max_scores[block_id] * query_score;
             }
         }
-        // }
     }
 
 protected:
@@ -461,7 +431,8 @@ private:
 
     mutable std::shared_mutex mtx_;
 };
-template class BMPAlg<float, int32_t>;
+template class BMPAlg<float, i32>;
+template class BMPAlg<float, i16>;
 // export template <typename DataType, typename IdxType>
 // class BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse> : public BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kFalse> {
 // public:
