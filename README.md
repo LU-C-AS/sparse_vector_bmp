@@ -7,7 +7,7 @@ This demo is based on sparse vector index implemented in infinity, using BMP alg
 ```
 # 1. build
 mkdir third_party
-git clone git clone https://github.com/google/googletest.git
+git clone https://github.com/google/googletest.git
 mkdir build
 cd build
 cmake ..
